@@ -1,5 +1,6 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using PlatformService.AsyncDataServices;
 using PlatformService.Data;
 using PlatformService.Dtos;
 using PlatformService.Models;
@@ -14,10 +15,12 @@ namespace PlatformService.Controllers
         private readonly IPlatformRepo _repository;
         private readonly IMapper _mapper;
         private readonly ICommandDataClient _commandDataClient;
+        private readonly IMessageBusClient _messageBusClient;
+
         public PlatformsController(IPlatformRepo repository, IMapper mapper,
-        
-        ICommandDataClient commandDataClient)
+        ICommandDataClient commandDataClient, IMessageBusClient messageBusClient)
         {
+            this._messageBusClient = messageBusClient;
             _commandDataClient = commandDataClient;
             _mapper = mapper;
             _repository = repository;
@@ -53,15 +56,25 @@ namespace PlatformService.Controllers
         _repository.SaveChanges();
 
         var returnPlatform = _mapper.Map<PlatformReadDto>(platformToAdd);
-        try 
+
+        // Send synchornous message
+        try
         {
             await _commandDataClient.SendPlatformToCommand(returnPlatform);
-        } 
-        catch(Exception ex)
-        {
+        } catch (Exception ex) {
             Console.WriteLine($"--> Could not send syncrhonously: {ex.Message}");
         }
-        
+
+        //Send Asynchronous message
+        try 
+        {
+            var platformPublishedDto = _mapper.Map<PlatformPublishedDto>(returnPlatform);
+            platformPublishedDto.Event = "Platform_published";
+            _messageBusClient.PublishNewPlatform(platformPublishedDto);
+        } catch {
+
+        }
+
         return CreatedAtRoute(nameof(GetPlatformById), new { Id = returnPlatform.Id }, returnPlatform);
     }
 }
