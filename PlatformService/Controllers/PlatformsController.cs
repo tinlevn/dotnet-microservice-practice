@@ -77,7 +77,6 @@ namespace PlatformService.Controllers
 
         return CreatedAtRoute(nameof(GetPlatformById), new { Id = returnPlatform.Id }, returnPlatform);
     }
-}
-
+    }
 
 }
